@@ -1,0 +1,28 @@
+
+-- Recreate the API token generation function
+CREATE OR REPLACE FUNCTION generate_api_token()
+RETURNS TEXT AS $$
+BEGIN
+  RETURN 'api_' || encode(gen_random_bytes(32), 'hex');
+END;
+$$ LANGUAGE plpgsql;
+
+-- Recreate the trigger function for new users
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, api_token)
+  VALUES (
+    NEW.id, 
+    NEW.email,
+    generate_api_token()
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Recreate the trigger
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
