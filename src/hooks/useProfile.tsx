@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
@@ -34,7 +33,37 @@ export const useProfile = () => {
       if (error) {
         console.error('Error fetching profile:', error);
       } else {
-        setProfile(data);
+        // Check if API token is missing and generate one
+        if (data && !data.api_token) {
+          try {
+            // Generate a new API token
+            const { data: tokenData, error: tokenError } = await supabase
+              .rpc('generate_api_token');
+
+            if (!tokenError && tokenData) {
+              // Update the profile with the new API token
+              const { data: updatedProfile, error: updateError } = await supabase
+                .from('profiles')
+                .update({ api_token: tokenData })
+                .eq('id', user.id)
+                .select()
+                .single();
+
+              if (!updateError && updatedProfile) {
+                setProfile(updatedProfile);
+              } else {
+                setProfile(data);
+              }
+            } else {
+              setProfile(data);
+            }
+          } catch (tokenGenerationError) {
+            console.error('Error generating API token:', tokenGenerationError);
+            setProfile(data);
+          }
+        } else {
+          setProfile(data);
+        }
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
